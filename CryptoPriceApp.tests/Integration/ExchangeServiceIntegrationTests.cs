@@ -42,7 +42,7 @@ namespace CryptoPriceApp.tests.Integration
             await _service.UnsubscribeFromWebSockets();
 
             Assert.NotEmpty(receivedPrices);
-            Assert.All(receivedPrices.Values, price => Assert.True(price > 0, "Цена должна быть положительной"));
+            Assert.All(receivedPrices.Values, price => Assert.True(price > 0));
         }
 
         [Fact]
