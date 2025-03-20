@@ -4,113 +4,76 @@ using Moq;
 
 namespace CryptoPriceApp.tests.Integration
 {
-    public class ExchangeServiceIntegrationTests
+    public class ExchangeServiceIntegrationTests(ExchangeServiceFixture fixture) : IClassFixture<ExchangeServiceFixture>
     {
-        private readonly Mock<IExchangeClient> _mockBinanceClient;
-        private readonly Mock<IExchangeClient> _mockBybitClient;
-        private readonly Mock<IExchangeClient> _mockKucoinClient;
-        private readonly Mock<IExchangeClient> _mockBitgetClient;
-        private readonly ExchangeService _exchangeService;
+        private readonly ExchangeService _service = fixture.Service;
 
-        public ExchangeServiceIntegrationTests()
+        [Fact]
+        public async Task GetPricesAsync_ShouldReturnPricesFromRealClients()
         {
-            _mockBinanceClient = new Mock<IExchangeClient>();
-            _mockBybitClient = new Mock<IExchangeClient>();
-            _mockKucoinClient = new Mock<IExchangeClient>();
-            _mockBitgetClient = new Mock<IExchangeClient>();
+            var result = await _service.GetPricesAsync("BTC-USDT");
 
-            // Устанавливаем уникальные имена бирж
-            _mockBinanceClient.Setup(c => c.ExchangeName).Returns("Binance");
-            _mockBybitClient.Setup(c => c.ExchangeName).Returns("Bybit");
-            _mockKucoinClient.Setup(c => c.ExchangeName).Returns("Kucoin");
-            _mockBitgetClient.Setup(c => c.ExchangeName).Returns("Bitget");
-
-            var clients = new List<IExchangeClient>
-        {
-            _mockBinanceClient.Object,
-            _mockBybitClient.Object,
-            _mockKucoinClient.Object,
-            _mockBitgetClient.Object
-        };
-
-            _exchangeService = new ExchangeService(clients);
+            Assert.NotEmpty(result);
+            Assert.All(result.Values, price => Assert.NotNull(price));
+            Assert.All(result.Values, price => Assert.True(price > 0));
         }
 
         [Fact]
-        public async Task GetPricesAsync_ShouldReturnValidPrices()
+        public async Task SubscribeToWebSockets_ShouldReceiveUpdates()
         {
-            // Arrange
-            _mockBinanceClient.Setup(c => c.GetPriceAsync("BTCUSDT")).ReturnsAsync(50000);
-            _mockBybitClient.Setup(c => c.GetPriceAsync("BTCUSDT")).ReturnsAsync(49990);
-            _mockKucoinClient.Setup(c => c.GetPriceAsync("BTC-USDT")).ReturnsAsync(50010);
-            _mockBitgetClient.Setup(c => c.GetPriceAsync("BTCUSDT")).ReturnsAsync(50005);
+            var receivedPrices = new Dictionary<string, decimal>();
 
-            // Act
-            var prices = await _exchangeService.GetPricesAsync("BTC-USDT");
-
-            // Assert
-            Assert.NotNull(prices);
-            Assert.Equal(4, prices.Count);
-            Assert.Equal(50000, prices["Binance"]);
-            Assert.Equal(49990, prices["Bybit"]);
-            Assert.Equal(50010, prices["Kucoin"]);
-            Assert.Equal(50005, prices["Bitget"]);
-        }
-
-        [Fact]
-        public async Task SubscribeToWebSockets_ShouldInvokeSubscriptionForAllExchanges()
-        {
-            // Arrange
-            var callbackInvoked = new Dictionary<string, bool>
+            void OnPriceUpdate(string exchange, decimal price)
             {
-                { "Binance", false },
-                { "Bybit", false },
-                { "Kucoin", false },
-                { "Bitget", false }
-            };
+                receivedPrices[exchange] = price;
+            }
 
-            _mockBinanceClient.Setup(c => c.SubscribeToWebSockets("BTCUSDT", It.IsAny<Action<string, decimal>>()))
-                              .Callback<string, Action<string, decimal>>((_, cb) => { callbackInvoked["Binance"] = true; })
-                              .Returns(Task.CompletedTask);
+            void OnError(string error)
+            {
+                Assert.Fail($"Ошибка подписки: {error}");
+            }
 
-            _mockBybitClient.Setup(c => c.SubscribeToWebSockets("BTCUSDT", It.IsAny<Action<string, decimal>>()))
-                            .Callback<string, Action<string, decimal>>((_, cb) => { callbackInvoked["Bybit"] = true; })
-                            .Returns(Task.CompletedTask);
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
 
-            _mockKucoinClient.Setup(c => c.SubscribeToWebSockets("BTC-USDT", It.IsAny<Action<string, decimal>>()))
-                             .Callback<string, Action<string, decimal>>((_, cb) => { callbackInvoked["Kucoin"] = true; })
-                             .Returns(Task.CompletedTask);
+            await _service.SubscribeToWebSockets("BTC-USDT", OnPriceUpdate, OnError, cts.Token);
 
-            _mockBitgetClient.Setup(c => c.SubscribeToWebSockets("BTCUSDT", It.IsAny<Action<string, decimal>>()))
-                             .Callback<string, Action<string, decimal>>((_, cb) => { callbackInvoked["Bitget"] = true; })
-                             .Returns(Task.CompletedTask);
+            
+            await Task.Delay(5000);
+            await _service.UnsubscribeFromWebSockets();
 
-            var tokenSource = new CancellationTokenSource();
-
-            // Act
-            await _exchangeService.SubscribeToWebSockets("BTC-USDT", (ex, price) => { }, null, tokenSource.Token);
-
-            // Assert
-            Assert.All(callbackInvoked.Values, Assert.True);
+            Assert.NotEmpty(receivedPrices);
+            Assert.All(receivedPrices.Values, price => Assert.True(price > 0, "Цена должна быть положительной"));
         }
 
         [Fact]
-        public async Task UnsubscribeFromWebSockets_ShouldInvokeUnsubscribeForAllExchanges()
+        public async Task UnsubscribeFromWebSockets_ShouldStopReceivingUpdates()
         {
-            // Arrange
-            _mockBinanceClient.Setup(c => c.UnsubscribeFromWebSockets()).Returns(Task.CompletedTask).Verifiable();
-            _mockBybitClient.Setup(c => c.UnsubscribeFromWebSockets()).Returns(Task.CompletedTask).Verifiable();
-            _mockKucoinClient.Setup(c => c.UnsubscribeFromWebSockets()).Returns(Task.CompletedTask).Verifiable();
-            _mockBitgetClient.Setup(c => c.UnsubscribeFromWebSockets()).Returns(Task.CompletedTask).Verifiable();
+            var receivedPrices = new List<decimal>();
 
-            // Act
-            await _exchangeService.UnsubscribeFromWebSockets();
+            void OnPriceUpdate(string exchange, decimal price)
+            {
+                receivedPrices.Add(price);
+            }
 
-            // Assert
-            _mockBinanceClient.Verify(c => c.UnsubscribeFromWebSockets(), Times.Once);
-            _mockBybitClient.Verify(c => c.UnsubscribeFromWebSockets(), Times.Once);
-            _mockKucoinClient.Verify(c => c.UnsubscribeFromWebSockets(), Times.Once);
-            _mockBitgetClient.Verify(c => c.UnsubscribeFromWebSockets(), Times.Once);
+            void OnError(string error)
+            {
+                Assert.Fail($"Ошибка подписки: {error}");
+            }
+
+            using var cts = new CancellationTokenSource(TimeSpan.FromSeconds(10));
+
+            await _service.SubscribeToWebSockets("BTC-USDT", OnPriceUpdate, OnError, cts.Token);
+            await Task.Delay(5000);
+
+            await _service.UnsubscribeFromWebSockets();
+            int countBefore = receivedPrices.Count;
+
+            await Task.Delay(5000);
+            int countAfter = receivedPrices.Count;
+
+            Assert.Equal(countBefore, countAfter);
         }
+
     }
+
 }

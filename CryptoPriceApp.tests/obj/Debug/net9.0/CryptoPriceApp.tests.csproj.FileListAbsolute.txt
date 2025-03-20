@@ -123,3 +123,4 @@ E:\Projects\CryptoPriceApp\CryptoPriceApp.tests\obj\Debug\net9.0\refint\CryptoPr
 E:\Projects\CryptoPriceApp\CryptoPriceApp.tests\obj\Debug\net9.0\CryptoPriceApp.tests.pdb
 E:\Projects\CryptoPriceApp\CryptoPriceApp.tests\obj\Debug\net9.0\CryptoPriceApp.tests.genruntimeconfig.cache
 E:\Projects\CryptoPriceApp\CryptoPriceApp.tests\obj\Debug\net9.0\ref\CryptoPriceApp.tests.dll
+E:\Projects\CryptoPriceApp\CryptoPriceApp.tests\obj\Debug\net9.0\CryptoPriceApp.tests.sourcelink.json
