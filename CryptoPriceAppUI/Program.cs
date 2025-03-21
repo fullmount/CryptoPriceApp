@@ -26,44 +26,47 @@ namespace CryptoPriceAppUI
             Application.EnableVisualStyles();
             Application.SetCompatibleTextRenderingDefault(false);
 
-            var services = ConfigureServices();
+            var services = ConfigureServices;
             using var serviceProvider = services.BuildServiceProvider();
 
             var form = serviceProvider.GetRequiredService<MainForm>();
             Application.Run(form);
         }
 
-        private static IServiceCollection ConfigureServices()
+        private static IServiceCollection ConfigureServices
         {
-            var services = new ServiceCollection();
-            string projectPath = Path.GetFullPath(Path.Combine(Directory.GetCurrentDirectory(), @"..\..\..\"));
+            get
+            {
+                var services = new ServiceCollection();
+                string projectPath = Path.GetFullPath(Path.Combine(Directory.GetCurrentDirectory(), @"..\..\..\"));
 
-            var config = new ConfigurationBuilder()
-                .SetBasePath(projectPath)
-                .AddJsonFile("appsettings.json", optional: false, reloadOnChange: true)
-            .Build();
+                var config = new ConfigurationBuilder()
+                    .SetBasePath(projectPath)
+                    .AddJsonFile("appsettings.json", optional: false, reloadOnChange: true)
+                .Build();
 
-            services.AddSingleton<IConfiguration>(config);
-            services.AddSingleton<IExchangeClient, BinanceClientWrapper>();
-            services.AddSingleton<IExchangeClient, BitgetClientWrapper>();
-            services.AddSingleton<IExchangeClient, KucoinClientWrapper>();
-            services.AddSingleton<IExchangeClient, BybitClientWrapper>();
-            //REST clients
-            services.AddScoped<IBinanceRestClient, BinanceRestClient>();
-            services.AddScoped<IKucoinRestClient, KucoinRestClient>();
-            services.AddScoped<IBitgetRestClient, BitgetRestClient>();
-            services.AddScoped<IBybitRestClient, BybitRestClient>();
-            //Web socket clients
-            services.AddSingleton<IBinanceSocketClient, BinanceSocketClient>();
-            services.AddSingleton<IBybitSocketClient, BybitSocketClient>();
-            services.AddSingleton<IKucoinSocketClient, KucoinSocketClient>();
-            services.AddSingleton<IBitgetSocketClient, BitgetSocketClient>();
+                services.AddSingleton<IConfiguration>(config);
+                services.AddSingleton<IExchangeClient, BinanceClientWrapper>();
+                services.AddSingleton<IExchangeClient, BitgetClientWrapper>();
+                services.AddSingleton<IExchangeClient, KucoinClientWrapper>();
+                services.AddSingleton<IExchangeClient, BybitClientWrapper>();
+                //REST clients
+                services.AddScoped<IBinanceRestClient, BinanceRestClient>();
+                services.AddScoped<IKucoinRestClient, KucoinRestClient>();
+                services.AddScoped<IBitgetRestClient, BitgetRestClient>();
+                services.AddScoped<IBybitRestClient, BybitRestClient>();
+                //Web socket clients
+                services.AddSingleton<IBinanceSocketClient, BinanceSocketClient>();
+                services.AddSingleton<IBybitSocketClient, BybitSocketClient>();
+                services.AddSingleton<IKucoinSocketClient, KucoinSocketClient>();
+                services.AddSingleton<IBitgetSocketClient, BitgetSocketClient>();
 
-            services.AddSingleton<ExchangeService>();
+                services.AddSingleton<ExchangeService>();
 
-            services.AddTransient<MainForm>();
+                services.AddTransient<MainForm>();
 
-            return services;
+                return services;
+            }
         }
     }
 }
